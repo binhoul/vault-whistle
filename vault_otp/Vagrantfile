@@ -1,0 +1,35 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/xenial64"
+  config.vm.box_check_update = false
+  config.vm.network "public_network", bridge: "en0: Wi-Fi (AirPort)"
+
+  config.vm.provision "file", source: "./templates/config.hcl", destination: "/tmp/config.hcl"
+  config.vm.provision "shell", inline: 
+  $script = <<-SCRIPT
+  if [[ ! -f /etc/vault-ssh-helper.d/config.hcl ]];
+    then
+    sudo mkdir /etc/vault-ssh-helper.d
+    sudo mv /tmp/config.hcl /etc/vault-ssh-helper.d/
+  fi
+
+  # install vault-ssh-helper
+  if [[ ! -f /usr/local/bin/vault-ssh-helper ]]
+    then
+    wget https://releases.hashicorp.com/vault-ssh-helper/0.1.4/vault-ssh-helper_0.1.4_linux_amd64.zip
+    sudo apt-get update && sudo apt-get install -y unzip
+    sudo unzip -q vault-ssh-helper_0.1.4_linux_amd64.zip -d /usr/local/bin
+    sudo chmod 0755 /usr/local/bin/vault-ssh-helper
+    sudo chown root:root /usr/local/bin/vault-ssh-helper
+  fi
+
+  # edit configuration
+  sudo sed -i 's/^@include common-auth/#@include common-auth/' /etc/pam.d/sshd
+  echo "auth requisite pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl" | tee -a /etc/pam.d/sshd
+  echo "auth optional pam_unix.so not_set_pass use_first_pass nodelay" | tee -a /etc/pam.d/sshd
+  sudo sed -i.bak 's/^ChallengeResponseAuthentication.*$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+  sudo sed -i 's/^PasswordAuthentication.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
+  sudo sed -i 's/^UsePAM.*$/UsePAM yes/' /etc/ssh/sshd_config
+  sudo systemctl restart sshd
+  SCRIPT
+  config.vm.provision "shell", inline: $script
+end
