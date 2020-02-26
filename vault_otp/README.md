@@ -1,18 +1,68 @@
 <!-- $theme: gaia -->
 
-# Landslide
+# Managing SSH OTP with vault
 
 ---
 
-## Use Vault manage static secrets
+## What's the problem?
+
+- SSH key sprawl
+- Little or no accounting of user access
+- Access management is tedious
+
+---
+
+## Vault and SSH
+
+- Unique SSH credentials on demand
+  - One-Time-Passwords
+  - Signing authority for SSH keys
+- Time-to-live on SSH credentials
+- Audit logging for SSH access
 
 
-### Persionas
+---
+
+## SSH OTP
+
+---
+
+![](./imgs/vault-ssh-otp-1.png)
+
+- An authenticated client requests an OTP from the Vault server. 
+- Vault issues and returns an OTP. 
+- Connect to the desired target host using OTP.
+
+---
+
+
+- When the client establishes an SSH connection, the OTP is received by the Vault helper which validates the OTP with the Vault server.
+
+- The Vault server then deletes this OTP, ensuring that it is only used once.
+
+---
+
+
+### Personas
 
 The end-to-end scenario described in this guide involves two personas:
 
-**devops** with privileged permissions to write secrets
-**apps** reads the secrets from Vault
+**operations** with privileged permissions to setup SSH secrets engine
+**client** trusted entity to request SSH OTP from Vault
+
+---
+
+### Goal
+
+- Understanding auth
+- Understanding policy
+- Understanding ssh otp
+
+### Prerequisites
+
+- Docker
+- Vagrant
+- [Scripts](https://github.com/binhoul/vault-whistle)
 
 ---
 
@@ -30,7 +80,7 @@ docker run -d --name vault-demo --rm -p 8200:8200 vault
 docker logs vault-demo
 
 export VAULT_ADDR='http://127.0.0.1:8200'
-export VAULT_TOKEN="s.KKYLixXUcwjGjxcpZh2hybus"
+export VAULT_TOKEN="s.xxxx"
 
 vault status
 docker exec -e VAULT_ADDR='http://0.0.0.0:8200' vault-demo vault status
@@ -86,6 +136,10 @@ vault login -method userpass \
 #### 5. Create a role for otp engine 
 
 ```
+# enable SSH secrets engine
+vault secrets enable ssh
+
+# create a role
 vault write ssh/roles/otp_demo \
 key_type=otp \
 default_user=ubuntu \
@@ -93,52 +147,44 @@ cidr_list=0.0.0.0/0
 
 ```
 
+This creates otp_demo with ubuntu as its default username for which a credential will be generated.
+
+
+
+---
+
 #### 6. Generate OTP
 
 ```
 vault write ssh/creds/otp_demo ip=x.x.x.x
 ```
 
----
+```
+Key                Value
+---                -----
+lease_id           ssh/creds/otp_demo/ElhqNgR2hcAfSb29WiJcajFl
+lease_duration     768h
+lease_renewable    false
+ip                 192.168.0.154
+key                055953f9-493a-3eda-3a36-ac2044bc8624
+key_type           otp
+port               22
+username           ubuntu
+```
 
-## What's the problem?
-
-- Immutable infrastructure is still future state for some enterprises
-- SSH key sprawl
-- Little or no accounting of user access
-- Access management is tedious
-
----
-
-## Vault and SSH
-
-- Unique SSH credentials on demand
-  - One-Time-Passwords
-  - Signing authority for SSH keys
-- Time-to-live on SSH credentials
-- Audit logging for SSH access
-
+Then use the token to ssh to the server
 
 ---
 
-## SSH OTP
-
----
-
-![](./imgs/vault-ssh-otp-1.png)
-
-- An authenticated client requests an OTP from the Vault server. 
-- Vault issues and returns an OTP. 
-- Connect to the desired target host using OTP.
-
----
+#### 7. Summary
 
 
-- When the client establishes an SSH connection, the OTP is received by the Vault helper which validates the OTP with the Vault server.
+- Auth
+- Policies
+- enable ssh otp engine and request the OTP
 
-- The Vault server then deletes this OTP, ensuring that it is only used once.
 
----
+![](./imgs/summary.png)
 
 
 

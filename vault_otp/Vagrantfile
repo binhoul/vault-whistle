@@ -23,9 +23,10 @@ Vagrant.configure("2") do |config|
   fi
 
   # edit configuration
-  sudo sed -i 's/^@include common-auth/#@include common-auth/' /etc/pam.d/sshd
-  echo "auth requisite pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl" | tee -a /etc/pam.d/sshd
-  echo "auth optional pam_unix.so not_set_pass use_first_pass nodelay" | tee -a /etc/pam.d/sshd
+  sudo sed -i '/^@include common-auth$/#@include common-auth/' /etc/pam.d/sshd
+  sudo sed -i '/common-auth/a \
+  auth requisite pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl\n\ 
+  auth optional pam_unix.so not_set_pass use_first_pass nodelay' /etc/pam.d/sshd
   sudo sed -i.bak 's/^ChallengeResponseAuthentication.*$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
   sudo sed -i 's/^PasswordAuthentication.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
   sudo sed -i 's/^UsePAM.*$/UsePAM yes/' /etc/ssh/sshd_config
